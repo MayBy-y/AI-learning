@@ -1,0 +1,68 @@
+.Chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 35px;
+}
+
+.top {
+    width: 95%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.login button {
+    font-size: 20px;
+    border: none;
+    padding: 5px 9px;
+    border-radius: 7px;
+}
+
+.login button:hover {
+    background-color: #cdcdcd;
+}
+
+/* Chatview */
+.chatView {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+    padding-top: 200px;
+}
+
+.chatView h2 {
+    font-size: 30px;
+}
+
+.inputDiv {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 800px;
+    height: 60px;
+    border-radius: 80px;
+    border: 1px solid #d7d5d5;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.inputDiv input {
+    border: none;
+    width: 650px;
+    height: 40px;
+    font-size: 20px;
+    outline: none;
+}
+
+.inputDiv span {
+    margin-left: 20px;
+}
+
+.inputDiv button {
+    margin-right: 20px;
+    padding: 6px 8px;
+    border-radius: 21px;
+    border: none;
+}
