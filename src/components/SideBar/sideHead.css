@@ -1,6 +1,6 @@
 /* 大盒子 */
 .leftSection {
-    height: 1000px;
+    height: 930px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -8,6 +8,10 @@
     background-color: #faf8f8;
     transition: transform 0.3s ease;
     overflow: hidden;
+}
+
+.smallOption:hover {
+    cursor: pointer;
 }
 
 /* 顶部logo和按钮 */

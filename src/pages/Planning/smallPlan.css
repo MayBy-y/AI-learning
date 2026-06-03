@@ -1,0 +1,55 @@
+.aiShine {
+
+    position: absolute;
+    top: 0;
+    left: -100%;
+
+    width: 35%;
+    height: 100%;
+
+    opacity: .3;
+
+    background: linear-gradient(90deg,
+            transparent,
+            white,
+            transparent);
+
+    animation: shine 5s linear infinite;
+}
+
+.buttonShine {
+
+    position: absolute;
+    inset: 0;
+
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, .2),
+            transparent);
+
+    animation: buttonShine 2s linear infinite;
+}
+
+@keyframes shine {
+
+    from {
+        left: -100%;
+    }
+
+    to {
+        left: 150%;
+    }
+
+}
+
+@keyframes buttonShine {
+
+    from {
+        transform: translateX(-100%);
+    }
+
+    to {
+        transform: translateX(100%);
+    }
+
+}

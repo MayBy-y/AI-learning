@@ -11,7 +11,7 @@
     z-index: 99999;
     top: 13px;
     right: 16px;
-    width: 82%;
+    width: 80%;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -35,6 +35,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
+    align-items: center;
     padding-top: 28px;
 }
 
@@ -89,8 +90,13 @@
 
 /* 消息列表 */
 .msgList {
-    height: 80%;
+    height: 750px;
     padding: 5px 22px;
+    max-width: 800px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .message {
@@ -103,8 +109,14 @@
     justify-content: flex-end;
 }
 
+.msgList .message:nth-child(2n) span {
+    max-width: 100%;
+}
+
 .message span {
+    display: block;
+    max-width: 40%;
     background-color: #f0f0f0;
     padding: 5px;
-    border-radius: 20%;
+    border-radius: 5%;
 }

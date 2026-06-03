@@ -1,25 +1,59 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import request from "../../utils/request";
 import "./login.css";
-
 export function Login() {
     const navigate = useNavigate();
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
 
-    function handleLogin(e: React.FormEvent) {
+    async function handleLogin(
+        e: React.FormEvent
+    ) {
+
         e.preventDefault();
 
         if (!username || !password) {
+
             alert("请输入用户名和密码");
+
             return;
+
         }
 
-        alert("登录成功");
-        navigate("/");
-    }
+        try {
 
+            const res =
+                await request.post(
+                    "/user/login",
+                    {
+                        username,
+                        password
+                    }
+                );
+            const result =
+                await request.get("/user/me")
+
+            console.log(result.data)
+            localStorage.setItem(
+                "token",
+                res.data.token
+            );
+            alert("登录成功");
+
+            navigate("/");
+
+        } catch (err: any) {
+
+            alert(
+                err.response?.data?.message
+                || "登录失败"
+            );
+
+        }
+
+    }
     return (
         <div className="auth-container">
             <div className="auth-card">

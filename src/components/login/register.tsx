@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import request from "../../utils/request";
 import "./login.css";
 
 export function Register() {
@@ -9,21 +10,49 @@ export function Register() {
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
 
-    function handleRegister(e: React.FormEvent) {
+    async function handleRegister(
+        e: React.FormEvent
+    ) {
+
         e.preventDefault();
 
         if (!username || !password || !confirm) {
+
             alert("请填写完整信息");
             return;
+
         }
 
         if (password !== confirm) {
+
             alert("两次密码不一致");
             return;
+
         }
 
-        alert("注册成功");
-        navigate("/login");
+        try {
+
+            await request.post(
+                "/user/register",
+                {
+                    username,
+                    password
+                }
+            );
+
+            alert("注册成功");
+
+            navigate("/login");
+
+        } catch (err: any) {
+
+            alert(
+                err.response?.data?.message
+                || "注册失败"
+            );
+
+        }
+
     }
 
     return (

@@ -1,19 +1,25 @@
 import './Chat.css'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Mic } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
-import axios from "axios"
+import { UserProfile } from '../../components/login/UserProfile';
+// import ReactMarkdown from "react-markdown"
+// import remarkGfm from "remark-gfm"
 export function TopChat() {
-    const [login, setlogin] = useState(false)
     const navigate = useNavigate()
+    const token = localStorage.getItem("token")
     return <>
         <div className='top'>
             <h2>AI Learning</h2>
-            {!login && <div className='login'><button onClick={() => {
-                navigate('/login')
-                setlogin(false)
-            }
-            }>登录</button> <button onClick={() => navigate('/register')}>注册</button></div>}
+            {!token &&
+                (<div className='login'>
+                    <button
+                        onClick={() => {
+                            navigate('/login')
+                        }
+                        }>登录</button>
+                    <button onClick={() => navigate('/register')}>注册</button></div>)}
+            {token && <UserProfile />}
         </div>
     </>
 }
@@ -21,15 +27,102 @@ export function TopChat() {
 export function ChatView() {
     const [say, setSay] = useState('')
     const [start, setstart] = useState(true)
-    const [message, setmessage] = useState<string[]>([])
+    const [message, setMessage] = useState<any[]>([])
+    const bottomRef = useRef(null)
+    const scrollTimer = useRef(null)
+
+    useEffect(() => {
+        if (scrollTimer.current) return
+
+        scrollTimer.current = setTimeout(() => {
+            bottomRef.current?.scrollIntoView({
+                behavior: 'smooth'
+            })
+            scrollTimer.current = null
+        }, 30) // 30ms 合并滚动
+    }, [message])
     async function putMsg() {
         if (!say.trim()) return alert('请输入问题')
-        setmessage(prev => [...prev, say])
-        const res = await axios.post('http://localhost:3000/api/ai/aiChat')
-        console.log(res);
-        setmessage(prev => [...prev, res.data.reply])
-        setSay('')
-        setstart(false)
+
+        const userMsg = say
+
+        // ✅ 一次性加入用户 + AI占位
+        setMessage(prev => [
+            ...prev,
+            { role: 'user', content: userMsg },
+            { role: 'assistant', content: "" }
+        ])
+
+        setSay("")
+        // console.log(message);
+
+        const response = await fetch('http://localhost:3000/api/ai/aiChat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message: userMsg, messages: message })
+        })
+
+        const reader = response.body?.getReader()
+        if (!reader) {
+            console.error("reader不存在")
+            return
+        }
+
+        const decoder = new TextDecoder()
+
+        let done = false
+        let aiText = ""
+        let buffer = "" // ⭐关键：缓存未处理的数据
+
+        while (!done) {
+            const { value, done: doneReading } = await reader.read()
+            done = doneReading
+
+            // ⭐ 防止中文乱码 + 支持流
+            buffer += decoder.decode(value, { stream: true })
+
+            // ⭐ 按完整事件切割
+            const parts = buffer.split(/\n\n|\r\n\r\n/)
+
+            // ⭐ 最后一个可能是不完整的，留着
+            buffer = parts.pop() || ""
+
+            for (const part of parts) {
+                if (part.startsWith("data: ")) {
+                    const data = part.replace("data: ", "").trim()
+                    // console.log(data);
+
+                    if (data === "[DONE]") {
+                        setstart(false)
+                        return
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data)
+                        // console.log(parsed);
+
+                        const content = parsed || ""
+
+                        aiText += content
+                        console.log('aaaa', content);
+                    } catch (e) {
+                        console.error("解析失败", data, e)
+                    }
+
+                    // ✅ 实时更新UI
+                    setMessage(prev => {
+                        const newArr = [...prev]
+                        newArr[newArr.length - 1] = {
+                            role: "assistant",
+                            content: aiText
+                        }
+                        return newArr
+                    })
+                }
+            }
+        }
     }
 
     return <section className='chatView'>
@@ -38,9 +131,15 @@ export function ChatView() {
             <div className='msgList'>
                 {message.map((msg, index) => (
                     <div key={index} className="message">
-                        <span>{msg}</span>
+                        <span>
+
+                            {msg.content}
+
+                        </span>
+
                     </div>
                 ))}
+                <div ref={bottomRef} />
             </div>
         }
         <div className='inputDiv'>
@@ -56,7 +155,13 @@ export function ChatView() {
             <button className='puton'
                 onClick={putMsg}
             ><svg viewBox="0 0 24 24" width="20" height="20">
-                    <path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" />
+                    <path
+                        d="M5 12h14M13 5l7 7-7 7"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="none"
+                        strokeLinecap="round"
+                    />
                 </svg></button>
         </div>
     </section>
