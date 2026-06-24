@@ -68,7 +68,26 @@
     background-color: #faf8f8;
 }
 
+
+
+.delete-icon {
+
+    cursor: pointer;
+    opacity: 0;
+    transition: 0.2s;
+    color: #888;
+}
+
+.chat-item:hover .delete-icon {
+    opacity: 1;
+}
+
+.delete-icon:hover {
+    color: red;
+}
+
 .histroy ul {
+    padding: 0px 10px;
     list-style: none;
     width: 100%;
     margin: 0;
@@ -78,12 +97,16 @@
 }
 
 .histroy ul li {
+    cursor: pointer;
+    border-radius: 10px;
+    margin: 0 10px;
     font-size: 20px;
-    padding: 0 0 0 20px;
+    padding: 0 20px 0 20px;
     height: 50px;
     line-height: 50px;
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .histroy ul li:hover {

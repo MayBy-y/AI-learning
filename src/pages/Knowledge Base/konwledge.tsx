@@ -3,6 +3,7 @@ import axios from "axios";
 import { SearchBox } from "./konwledegSearch";
 import "./konwledge.css";
 import { useNavigate } from 'react-router-dom';
+import request from "../../utils/request";
 interface Knowledge {
 
     id: number;
@@ -84,9 +85,12 @@ export default function KonwledgePage() {
 
     })
     async function getKnowledge() {
+        const result = await request.get("/user/me")
+        const userId = result.data.user.id
+
 
         const res = await axios.get(
-            "http://localhost:3000/api/knowledge/list"
+            `http://localhost:3000/api/knowledge/list/${userId}`,
         );
 
         setList(res.data);
@@ -160,12 +164,13 @@ export default function KonwledgePage() {
             )
 
         } else {
-
+            const result = await request.get("/user/me")
+            const userId = result.data.user.id
             const res = await axios.post(
-
                 "http://localhost:3000/api/knowledge/add",
 
                 {
+                    userId,
                     title,
                     content,
                     tags,

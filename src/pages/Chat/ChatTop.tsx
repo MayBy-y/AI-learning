@@ -3,6 +3,11 @@ import { useState, useRef, useEffect } from 'react'
 import { Mic } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import { UserProfile } from '../../components/login/UserProfile';
+import request from '../../utils/request';
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import rehypeHighlight from "rehype-highlight"
+import "highlight.js/styles/github.css"
 // import ReactMarkdown from "react-markdown"
 // import remarkGfm from "remark-gfm"
 export function TopChat() {
@@ -23,11 +28,19 @@ export function TopChat() {
         </div>
     </>
 }
+type SideBarProps = {
+    start: boolean
+    conversationId: string
+    setstart: (item: boolean) => void
+    setConversationId: React.Dispatch<React.SetStateAction<string>>
+    message: any[];
+    setMessage: React.Dispatch<React.SetStateAction<any[]>>;
+}
 
-export function ChatView() {
+export function ChatView({ start, setstart, conversationId, setConversationId, message, setMessage }: SideBarProps) {
     const [say, setSay] = useState('')
-    const [start, setstart] = useState(true)
-    const [message, setMessage] = useState<any[]>([])
+
+
     const bottomRef = useRef(null)
     const scrollTimer = useRef(null)
 
@@ -41,11 +54,27 @@ export function ChatView() {
             scrollTimer.current = null
         }, 30) // 30ms 合并滚动
     }, [message])
+    useEffect(() => {
+        if (start) {
+            setMessage([]);
+        }
+    }, [start]);
+
+    //发送消息
     async function putMsg() {
         if (!say.trim()) return alert('请输入问题')
-
         const userMsg = say
+        let newId
+        const user = await request.get("/user/me")
+        const userId = user.data.user.id
+        if (!conversationId) {
 
+            const res = await request.post('/ai/create', { userId: userId })
+            console.log(res.data);
+            setConversationId(res.data.id)
+            newId = res.data.id
+        }
+        const currentConversationId = conversationId || newId;
         // ✅ 一次性加入用户 + AI占位
         setMessage(prev => [
             ...prev,
@@ -61,7 +90,7 @@ export function ChatView() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ message: userMsg, messages: message })
+            body: JSON.stringify({ message: userMsg, conversationId: currentConversationId, userId: userId })
         })
 
         const reader = response.body?.getReader()
@@ -131,11 +160,18 @@ export function ChatView() {
             <div className='msgList'>
                 {message.map((msg, index) => (
                     <div key={index} className="message">
-                        <span>
-
-                            {msg.content}
-
-                        </span>
+                        {msg.role === "assistant" ? (
+                            <div className="markdown prose prose-sm dark:prose-invert max-w-none text-left">
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeHighlight]}
+                                >
+                                    {msg.content}
+                                </ReactMarkdown>
+                            </div>
+                        ) : (
+                            <span className='useMsg'>{msg.content}</span>
+                        )}
 
                     </div>
                 ))}
@@ -143,7 +179,7 @@ export function ChatView() {
             </div>
         }
         <div className='inputDiv'>
-            <span>✚</span>
+            <button className='file'>✚</button>
             <input type="text"
                 value={say}
                 onChange={(e) => setSay(e.target.value)}

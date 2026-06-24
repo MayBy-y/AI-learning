@@ -32,19 +32,21 @@ export function Login() {
                         password
                     }
                 );
-            const result =
-                await request.get("/user/me")
-
-            console.log(result.data)
             localStorage.setItem(
                 "token",
                 res.data.token
             );
+            const result =
+                await request.get("/user/me")
+
+            console.log(result.data)
+
             alert("登录成功");
 
             navigate("/");
 
         } catch (err: any) {
+            console.log(err);
 
             alert(
                 err.response?.data?.message

@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 import dotenv from "dotenv"
 import db from "../db/index.js"
 import z from "zod"
-import { analyzeStudyData, deriveLearningState } from "../utils/analyzeStudy.js"
+import { analyzeStudyData, deriveLearningState, calculateMastery } from "../utils/analyzeStudy.js"
 import { v4 as uuidv4 } from "uuid";
 dotenv.config()
 const client = new OpenAI({
@@ -147,74 +147,163 @@ ${time}
 PlanRouter.post('/dailyPlan', async (req, res) => {
     try {
         const { list, goal, planId, userId } = req.body
-        const propmt = `
-  你是一个现实主义学习规划助手。
+        let propmt = `
+你是一名专业学习规划助手。
 
-你的任务：
-根据用户的【总体学习计划】，
-生成【仅今天需要完成】的学习计划。
+任务：
 
-你必须优先考虑：
-- 用户真实学习能力
-- 学习可持续性
-- 今日可执行性
-- 用户当前学习阶段
+根据用户总体学习计划和学习目标，
+生成仅今天需要完成的学习任务。
 
-必须遵守以下规则：
+生成任务时必须遵循：
 
-1. 只生成“今天”的学习任务
+【计划规则】
+
+1. 只生成今天需要完成的内容
 2. 不要生成多天计划
-3. 每天最多安排 2~4 个任务
-4. 每个任务控制在 30~90 分钟
-5. 必须循序渐进
-6. 不要生成理想化计划
-7. 不要假设用户全天学习
-8. 如果任务较复杂，自动拆分成小步骤
-9. 优先安排当前阶段最重要的内容
+3. 每天安排 2~4 个任务
+4. 每个任务预计 30~90 分钟
+5. 必须符合当前学习阶段
+6. 必须循序渐进
+7. 不要安排明显超纲内容
+8. 不要生成理想化计划
+9. 不要假设用户全天学习
 10. 不要重复任务
-11. 内容必须简洁明确
-12. 必须贴合用户当前学习阶段
-13. 不要生成已经明显超出当前阶段的内容
-14. 任务必须真正帮助用户推进整体目标
+11. 每个任务必须具体且可执行
+12. 如果内容较大，自动拆分为小任务
+13. 优先安排最重要、最基础的内容
+14. 所有任务必须能够推动总体目标前进
 
-任务要求：
+--------------------------------------------------
 
-1. 明确今天要完成什么
-2. 每个任务必须具体
-3. 不要输出空话
-4. 不要输出解释
-5. 不要输出 markdown
-6. 不要输出 \`\`\`
-7. 只返回合法 JSON 数组
-8. 最外层必须是 []
+【知识点规则】
+
+每个任务必须包含 knowledgePoints 字段。
+
+knowledgePoints 用于描述：
+
+用户完成该任务后，
+应该掌握的具体知识点。
+
+规则：
+
+1. 每个任务必须包含 knowledgePoints
+2. knowledgePoints 类型必须为 string
+3. 每个任务包含 1~3 个知识点
+4. 知识点必须与任务直接相关
+5. 必须是未来可以用于复习的知识概念
+6. 不允许重复知识点
+7. 使用简洁名称
+8. 禁止使用学习行为描述
+9. 禁止出现任务名称本身
+10. 知识点必须尽量具体
+
+--------------------------------------------------
+
+知识点示例：
+
+正确：
+
+- 元素选择器
+- 类选择器
+- ID选择器
+- 盒模型
+- Flex布局
+- Grid布局
+- Promise
+- 闭包
+- JavaScript变量
+- TypeScript接口
+- TypeScript泛型
+- interface
+- extends
+- keyof
+- Vue组件通信
+- Vue响应式原理
+- Pinia状态管理
+
+错误：
+
+- 学习CSS
+- CSS练习
+- 完成项目
+- 页面布局
+- 理解概念
+- 编写代码
+- 学习接口
+- 练习泛型
+
+--------------------------------------------------
+
+【输出要求】
+
+1. 只返回合法 JSON
+2. 不要输出任何解释
+3. 不要输出 markdown
+4. 不要输出 \`\`\`
+5. 必须能够被 JSON.parse() 直接解析
+6. 最外层必须是对象 {}
+7. tasks 必须是数组
+
+--------------------------------------------------
 
 返回格式：
 
-[
-  {
-    "id": "1",
-    "type": "title",
-    "content": "今日学习计划"
-  },
-  {
-    "id": "2",
-    "type": "task",
-    "content": "学习 TypeScript 基础类型",
-    "status": "todo",
-    "estimatedMinutes": 45,
-    "difficulty": "easy"
-  }
-]
+{
+  "tasks": [
+    {
+      "id": "1",
+      "type": "task",
+      "content": "学习 CSS 元素选择器",
+      "knowledgePoints":"元素选择器",
+      "status": "todo",
+      "estimatedMinutes": 30,
+      "difficulty": "easy"
+    },
+    {
+      "id": "2",
+      "type": "task",
+      "content": "练习 CSS 类选择器",
+      "knowledgePoints": "类选择器",
+      "status": "todo",
+      "estimatedMinutes": 45,
+      "difficulty": "medium"
+    }
+  ]
+}
+
+--------------------------------------------------
 
 字段规则：
 
-- id: string
-- type: "title" | "task"
+id:
+- string
 
-task 额外字段：
-- status: "todo"
-- estimatedMinutes: number
-- difficulty: "easy" | "medium" | "hard"
+type:
+- 固定为 "task"
+
+content:
+- 学习任务描述
+
+knowledgePoints:
+- string
+- 每个任务只需要1个知识点
+- 必须与当前任务直接相关
+- 用于后续复习规划
+- 用于知识掌握度统计
+
+status:
+- 固定为 "todo"
+
+estimatedMinutes:
+- number
+
+difficulty:
+- "easy"
+- "medium"
+- "hard"
+
+--------------------------------------------------
 
 用户总体学习计划：
 
@@ -222,8 +311,352 @@ ${list}
 
 用户学习目标：
 
-${goal}    `
+${goal}
+`
 
+        console.log('planId:', planId);
+        //获取历史学习数据
+        const reports = await db.query(
+            `
+SELECT
+    report_date,
+    completion_rate,
+    total_study_time,
+    average_task_time,
+    learning_state,
+    fatigue_level,
+    focus_level,
+    strengths,
+    weaknesses,
+    tomorrow_focus
+FROM study_reports
+WHERE user_id=$1
+AND plan_id=$2
+ORDER BY report_date DESC
+LIMIT 7
+`,
+            [userId, planId]
+        )
+        console.log(reports);
+        //分析用户近期学习侧写
+        if (reports) {
+            const recentReports = reports.rows
+            //绘制用户学习画像
+            const latestFocus =
+                recentReports[0]?.focus_level || "normal"
+
+            const latestFatigue =
+                recentReports[0]?.fatigue_level || "normal"
+
+            const latestLearningState =
+                recentReports[0]?.learning_state || "normal"
+
+            const weaknesses =
+                [...new Set(
+                    recentReports.flatMap(
+                        item => item.weaknesses || []
+                    )
+                )]
+            const avgCompletion =
+                recentReports.reduce(
+                    (sum, item) =>
+                        sum + Number(item.completion_rate),
+                    0
+                ) / recentReports.length
+            const avgStudyTime =
+                recentReports.reduce(
+                    (sum, item) =>
+                        sum + Number(item.total_study_time),
+                    0
+                ) / recentReports.length
+            const focusLevels =
+                recentReports.map(item => item.focus_level)
+
+            propmt = `
+你是一名专业学习规划助手（Learning Planner Agent）。
+
+你的职责不是简单拆分任务。
+
+而是根据：
+
+- 用户总体学习计划
+- 用户学习目标
+- 用户最近学习表现
+- 用户学习习惯
+- 用户知识掌握情况
+
+生成最适合今天完成的学习计划。
+
+==================================================
+
+【用户总体学习计划】
+
+${list}
+
+==================================================
+
+【用户学习目标】
+
+${goal}
+
+==================================================
+
+【用户学习画像】
+
+平均完成率：
+
+${avgCompletion.toFixed(0)}%
+
+平均学习时长：
+
+${avgStudyTime.toFixed(0)}分钟
+
+最近专注度：
+
+${latestFocus}
+
+最近疲劳程度：
+
+${latestFatigue}
+
+最近学习状态：
+
+${latestLearningState}
+
+近期薄弱点：
+
+${JSON.stringify(weaknesses)}
+
+==================================================
+
+【任务规划规则】
+
+1. 只生成今天需要完成的任务
+
+2. 不允许生成未来多天计划
+
+3. 每天安排 2~4 个任务
+
+4. 每个任务预计 20~90 分钟
+
+5. 必须符合当前学习阶段
+
+6. 必须循序渐进
+
+7. 不允许超纲
+
+8. 不允许理想化计划
+
+9. 默认用户不是全天学习
+
+10. 所有任务必须具体且可执行
+
+11. 大任务自动拆分
+
+12. 优先安排重要基础内容
+
+13. 所有任务必须推动总体目标前进
+
+==================================================
+
+【个性化规划规则】
+
+如果平均完成率低于60%
+
+- 减少任务数量
+- 降低任务难度
+- 优先保证完成率
+
+--------------------------------------------------
+
+如果平均完成率高于85%
+
+- 可以增加任务难度
+- 可以增加任务量
+
+--------------------------------------------------
+
+如果平均学习时长低于60分钟
+
+- 今日总学习时长不要超过90分钟
+
+--------------------------------------------------
+
+如果平均学习时长高于120分钟
+
+- 可以安排更完整的学习内容
+
+--------------------------------------------------
+
+如果最近专注度较低
+
+- 优先安排短任务
+- 避免复杂综合任务
+
+--------------------------------------------------
+
+如果最近专注度较高
+
+- 可以安排挑战性任务
+
+--------------------------------------------------
+
+如果最近疲劳程度较高
+
+- 降低学习负担
+- 避免连续高难度任务
+
+--------------------------------------------------
+
+如果最近学习状态良好
+
+- 允许推进新的知识内容
+
+--------------------------------------------------
+
+如果存在薄弱点
+
+- 优先安排相关内容
+- 必须至少安排一个针对薄弱点的任务
+
+==================================================
+
+【知识点规则】
+
+每个任务必须包含 knowledgePoints 字段。
+
+knowledgePoints：
+
+1. 必须为 string
+
+2. 必须是具体知识概念
+
+3. 必须与任务直接相关
+
+4. 后续将用于：
+
+- AI复习
+- 掌握度统计
+- 知识图谱
+
+--------------------------------------------------
+
+正确示例：
+
+Flex布局
+
+Grid布局
+
+Promise
+
+闭包
+
+JavaScript作用域
+
+TypeScript接口
+
+TypeScript泛型
+
+React Hooks
+
+==================================================
+
+错误示例：
+
+学习CSS
+
+练习代码
+
+完成任务
+
+理解概念
+
+==================================================
+
+【输出要求】
+
+必须只返回合法JSON
+
+不要解释
+
+不要输出markdown
+
+不要输出代码块
+
+不要输出任何额外文本
+
+==================================================
+
+返回格式：
+
+{
+  "tasks":[
+    {
+      "id":"1",
+      "type":"task",
+      "content":"学习TypeScript泛型约束",
+      "knowledgePoints":"TypeScript泛型约束",
+      "reason":"用户近期状态良好，适合推进新知识",
+      "status":"todo",
+      "estimatedMinutes":45,
+      "difficulty":"medium"
+    },
+    {
+      "id":"2",
+      "type":"task",
+      "content":"复习Promise异常处理",
+      "knowledgePoints":"Promise异常处理",
+      "reason":"该知识属于近期薄弱点",
+      "status":"todo",
+      "estimatedMinutes":30,
+      "difficulty":"easy"
+    }
+  ]
+}
+
+==================================================
+
+字段规则：
+
+id：
+string
+
+type：
+只能是 task
+
+content：
+任务内容
+
+knowledgePoints：
+知识点
+
+reason：
+安排原因
+
+status：
+固定 todo
+
+estimatedMinutes：
+number
+
+difficulty：
+只能是
+
+easy
+medium
+hard
+
+==================================================
+
+请结合用户学习画像和学习目标，
+
+生成今天最合理、最容易坚持完成、最能推进长期目标的学习计划。
+
+只返回JSON。
+`
+            console.log('jiaruyonghuhuaxiang');
+
+        }
         const result = await client.chat.completions.create({
             model: "qwen-turbo",
             messages: [
@@ -231,12 +664,12 @@ ${goal}    `
                 { role: "user", content: propmt }
             ]
         })
-        // console.log(result.choices[0].message.content);
         const raw = result.choices[0].message.content
         const clean = raw.replace(/```json|```/g, "").trim()
         let parsed = parseIfJson(clean)
+        const tasks = parsed.tasks || []
         console.log(parsed)
-        console.log(planId)
+        console.log('task', tasks)
         const today = new Date()
             .toISOString()
             .split('T')[0]
@@ -249,6 +682,7 @@ INSERT INTO daily_plans
     user_id,
     plan_id,
     plan_date
+  
 )
 VALUES
 (
@@ -260,12 +694,12 @@ RETURNING id
                     uuidv4(),
                     userId,
                     planId,
-                    today
+                    today,
                 ]
             )
 
         const dailyPlanId = dailyPlanResult.rows[0].id
-        for (const item of parsed) {
+        for (const item of tasks) {
             const taskId = uuidv4()
             if (item.type !== "task") continue
             item.dailyId = taskId
@@ -279,11 +713,12 @@ RETURNING id
         status,
         estimated_minutes,
         difficulty,
-        type
+        type,
+        knowledge_point
     )
     VALUES
     (
-        $1,$2,$3,$4,$5,$6,$7
+        $1,$2,$3,$4,$5,$6,$7,$8
     )
     `,
                 [
@@ -293,16 +728,18 @@ RETURNING id
                     "todo",
                     item.estimatedMinutes,
                     item.difficulty,
-                    item.type
+                    item.type,
+                    JSON.stringify(item.knowledgePoints),
                 ]
             )
 
 
         }
+
         res.json({
             code: 200,
             dailyPlanId,
-            data: parsed
+            data: tasks
         })
     } catch (error) {
         console.log(error);
@@ -512,9 +949,101 @@ ${JSON.stringify(sortedCandidates, null, 2)}
 PlanRouter.post('/result', async (req, res) => {
     try {
         const { taskList, dailyPlanId, planId, usersId } = req.body
+        console.log('palnid:', planId);
+
         //根据任务列表得到的学习数据
-        console.log(taskList);
+        // console.log(taskList);
         for (const task of taskList) {
+            //存知识掌握度
+            console.log('task=', task)
+            console.log('knowledgePoints=', task.knowledgePoints)
+            if (!task.knowledge_point && !task.knowledgePoints)
+                continue
+
+
+            const gain = calculateMastery(task)
+            console.log('gain', gain);
+            const interval =
+                gain >= 90 ? 14 :
+                    gain >= 75 ? 7 :
+                        gain >= 60 ? 3 :
+                            1;
+            const exists = await db.query(
+                `
+            SELECT *
+            FROM knowledge_mastery
+            WHERE
+                user_id=$1
+                AND knowledge_name=$2
+            `,
+                [
+                    usersId,
+                    task.knowledgePoints
+                ]
+            )
+            if (exists.rows.length === 0) {
+
+                await db.query(
+                    `
+        INSERT INTO knowledge_mastery
+        (
+            id,
+            user_id,
+            knowledge_name,
+            mastery,
+            review_count,
+            last_review_time,
+            next_review_time
+        )
+        VALUES
+        (
+            gen_random_uuid(),
+            $1,
+            $2,
+            $3,
+            1,
+            CURRENT_DATE,
+            CURRENT_DATE + $4::integer
+        )
+        `,
+                    [
+                        usersId,
+                        task.knowledgePoints,
+                        gain,
+                        interval
+                    ])
+            }
+            else {
+
+                await db.query(
+                    `
+        UPDATE knowledge_mastery
+        SET
+            mastery =
+            LEAST(
+                mastery + gain * 0.1,
+                100 
+            ),
+
+            review_count =
+            review_count + 1,
+
+            last_review_time =
+            CURRENT_DATE,
+           next_review_time = CURRENT_DATE + $4::integer
+
+        WHERE
+            user_id=$1
+            AND knowledge_name=$2
+        `,
+                    [
+                        usersId,
+                        task.knowledgePoints,
+                        gain,
+                        interval
+                    ])
+            }
+
 
             await db.query(
                 `
@@ -668,6 +1197,106 @@ VALUES
                 JSON.stringify(reply.strengths),
                 JSON.stringify(reply.weaknesses),
                 JSON.stringify(reply.tomorrowFocus)
+            ]
+        )
+        //开始判断总计划进程
+        const planResult = await db.query(
+            `
+SELECT *
+FROM study_plans
+WHERE id=$1
+`,
+            [planId]
+        )
+        console.log('planResult', planResult);
+
+        const taskResult = await db.query(
+            `
+SELECT
+content,
+status
+FROM study_tasks
+WHERE plan_id=$1
+`,
+            [planId]
+        )
+        const progressPrompt = `
+你是学习进度评估AI。
+
+请根据：
+
+1. 用户总学习目标
+2. 总计划任务
+3. 今日完成情况
+4. 历史学习表现
+
+判断：
+
+当前完成百分比
+
+当前所处阶段
+
+返回：
+
+{
+  "progress":35,
+  "currentStage":"TS基础阶段"
+}
+
+progress范围：
+
+0~100
+`
+
+        const progressResult = await client.chat.completions.create({
+            model: "qwen-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: progressPrompt
+                },
+                {
+                    role: "user",
+                    content: `
+总目标：
+
+${planResult.rows[0].goal}
+
+总计划：
+
+${JSON.stringify(taskResult.rows)}
+
+今日完成：
+
+${JSON.stringify(taskList)}
+
+学习报告：
+
+${JSON.stringify(reply)}
+`
+                }
+            ]
+        })
+        const progressData = parseIfJson(
+            progressResult
+                .choices[0]
+                .message
+                .content
+        )
+        console.log('progressData', progressData);
+
+        await db.query(
+            `
+UPDATE study_plans
+SET
+    progress=$1,
+    current_stage=$2
+WHERE id=$3
+`,
+            [
+                progressData.progress,
+                progressData.currentStage,
+                planId
             ]
         )
         res.json({
@@ -1106,7 +1735,6 @@ ${task.content}
 })
 
 //获得总任务列表
-
 PlanRouter.get('/getList/:userId', async (req, res) => {
     try {
         console.log('diaoyong');
@@ -1114,42 +1742,46 @@ PlanRouter.get('/getList/:userId', async (req, res) => {
 
         const result = await db.query(
             `
-            SELECT
-                p.id,
-                p.goal,
-                p.created_at,
+           SELECT
+    p.id,
+    p.goal,
+    p.progress,
+    p.created_at,
 
-                COUNT(t.id) AS total_tasks,
+    COUNT(t.id) AS total_tasks,
 
-                COUNT(*) FILTER(
-                    WHERE t.status='done'
-                ) AS done_tasks
+    COUNT(*) FILTER (
+        WHERE t.status = 'done'
+    ) AS done_tasks,
+    
+    EXISTS(
+        SELECT 1
+        FROM study_reports r
+        WHERE r.plan_id = p.id
+        AND r.user_id = p.user_id
+        AND r.report_date = CURRENT_DATE
+    ) AS studied_today
 
-            FROM study_plans p
 
-            LEFT JOIN study_tasks t
-            ON p.id = t.plan_id
+FROM study_plans p
 
-            WHERE p.user_id=$1
+LEFT JOIN study_tasks t
+ON p.id = t.plan_id
 
-            GROUP BY p.id
+WHERE p.user_id = $1
 
-            ORDER BY p.created_at DESC
+GROUP BY
+    p.id,
+    p.goal,
+    p.progress,
+    p.created_at
+
+ORDER BY p.created_at DESC;
             `,
             [userId]
         )
-        console.log(result);
-
         const data = result.rows.map(item => ({
-            ...item,
-            progress:
-                item.total_tasks == 0
-                    ? 0
-                    : Math.floor(
-                        item.done_tasks /
-                        item.total_tasks *
-                        100
-                    )
+            ...item
         }))
 
         res.json({
@@ -1184,9 +1816,33 @@ PlanRouter.get('/continue/:planId', async (req, res) => {
         if (
             planResult.rows.length === 0
         ) {
+            const list = await db.query(
+                `
+                SELECT *
+                
+                FROM study_tasks
+                WHERE plan_id=$1
+                `,
+                [planId]
+
+
+            )
+            const result = await db.query(
+                `
+    SELECT goal
+    FROM study_plans
+    WHERE id = $1
+    `,
+                [planId]
+            );
+
+            const goal = result.rows[0]?.goal;
+
 
             return res.json({
-                hasPlan: false
+                hasPlan: false,
+                details: list.rows,
+                goal
             })
         }
 

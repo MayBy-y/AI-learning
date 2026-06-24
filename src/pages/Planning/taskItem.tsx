@@ -10,6 +10,7 @@ interface oneItem {
     //depth / parentId 模拟层级
     parentId?: string | null;
     depth: number;
+    knowledgePoints?: string
 
     status?: "todo" | "doing" | "done" | "paused" | "skipped";
     startTime?: number;
@@ -179,7 +180,7 @@ export function TaskItem({
                                     : i
                             )
                         );
-                        if (item.status === 'todo') { chooseNext() }
+                        if (item.status !== 'done') { chooseNext() }
                     }}
                 />
 

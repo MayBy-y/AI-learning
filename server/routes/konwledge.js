@@ -9,7 +9,7 @@ konwRouter.post('/add', async (req, res) => {
 
     try {
 
-        const { title, content, tags, resource_url, resource_name } = req.body
+        const { userId, title, content, tags, resource_url, resource_name } = req.body
 
         const sql = `
     
@@ -19,7 +19,9 @@ konwRouter.post('/add', async (req, res) => {
  content,
  tags,
  resource_url,
- resource_name
+ resource_name,
+ user_id,
+created_at
 )
 
 VALUES
@@ -28,7 +30,9 @@ VALUES
  $2,
  $3,
  $4,
- $5
+ $5,
+ $6,
+ CURRENT_DATE
 )
  RETURNING id
         `
@@ -38,10 +42,45 @@ VALUES
             content,
             tags,
             resource_url || null,
-
-            resource_name || null
+            resource_name || null,
+            userId
         ])
         const id = result.rows[0].id
+
+        await db.query(
+            `
+            INSERT INTO knowledge_mastery
+            (
+                id,
+                user_id,
+                knowledge_id,
+                knowledge_name,
+                mastery,
+                review_count,
+                last_review_time,
+                next_review_time
+            )
+            VALUES
+            (
+                gen_random_uuid(),
+                $1,
+                $2,
+                $3,
+                10,
+                0,
+                NULL,
+                CURRENT_DATE
+            )
+            `,
+            [
+                userId,
+                id,
+                title
+            ]
+        )
+
+        await db.query('COMMIT')
+
         res.send({
             message: '添加成功',
             id
@@ -57,25 +96,46 @@ VALUES
     }
 
 })
-konwRouter.get('/list', async (req, res) => {
-
+//获取知识库列表
+konwRouter.get('/list/:id', async (req, res) => {
+    const { id } = req.params
     const sql = `
-      SELECT *
-      FROM knowledge
-      ORDER BY created_at DESC
-    `
+  SELECT *
+  FROM knowledge
+  WHERE user_id = $1
+  ORDER BY created_at DESC
+`;
 
-    const result = await db.query(sql)
+    const result = await db.query(sql, [id]);
 
     res.send(result.rows)
 
 })
+konwRouter.get('/reviewList/:id', async (req, res) => {
+    const { id } = req.params
+    const sql = `
+ SELECT *
+FROM knowledge_mastery
+WHERE
+    user_id = $1
+    AND next_review_time <= NOW()
+`;
 
+    const result = await db.query(sql, [id]);
+
+    res.send(result.rows)
+
+})
 konwRouter.delete("/delete/:id", async (req, res) => {
 
     try {
 
         const { id } = req.params;
+        await db.query(
+            `DELETE FROM knowledge_mastery
+     WHERE knowledge_id=$1`,
+            [id]
+        )
 
         const sql = `
             DELETE FROM knowledge

@@ -15,6 +15,10 @@
 
 }
 
+.card {
+    cursor: pointer;
+}
+
 .header h1 {
 
     color: #4e4e4e;

@@ -26,7 +26,7 @@ interface oneItem {
     //depth / parentId 模拟层级
     parentId?: string | null;
     depth: number;
-
+    knowledgePoints?: string
     status?: "todo" | "doing" | "done" | "paused" | "skipped";
     startTime?: number;
     endTime?: number;
@@ -59,6 +59,7 @@ interface Plan {
     total_tasks: number
 
     done_tasks: number
+    studied_today: boolean
 }
 const AiPlan: React.FC = () => {
     const [goal, setGoal] = useState("");
@@ -71,7 +72,7 @@ const AiPlan: React.FC = () => {
     const [openTime, setOpenTime] = useState<boolean>(false)
     const [right, setRight] = useState<boolean>(false)
     const [aihelp, setAihelp] = useState<aiHelp | null>(null)
-    const [planId, setPlanId] = useState(null)
+    const [planId, setPlanId] = useState<string | null>(null)
     const [dailyPlan, setDailyPlan] = useState(null)
     const [planList, setPlanList] = useState<Plan[]>([])
     //记录拖拽对象
@@ -154,7 +155,6 @@ const AiPlan: React.FC = () => {
             await axios.get(
                 `http://localhost:3000/api/ai/getList/${userId}`
             )
-        console.log(res);
 
         setPlanList(res.data.data)
     }
@@ -162,12 +162,33 @@ const AiPlan: React.FC = () => {
     async function handleContinue(
         planId: string
     ) {
-        const res = await request.get(`/ai/continue/${planId}`)
-        console.log(res);
-        setDailyPlan(res.data.dailyPlan.id)
-        console.log('aaa', res.data.tasks);
-        setFinal(res.data.tasks);
-        setShowDaily(true);
+        setPlanId(planId)
+        const list = await request.get(`/ai/continue/${planId}`)
+        console.log(list.data);
+        if (list.data.hasPlan === false) {
+            const user = await request.get("/user/me");
+            console.log(user);
+            const usersid = user.data.user.id
+            const res = await axios.post(
+                "http://localhost:3000/api/ai/dailyPlan",
+                {
+                    userId: usersid,
+                    planId: planId,
+                    list: list.data.details,
+                    goal: list.data.goal,
+                }
+            );
+
+            setDailyPlan(res.data.dailyPlanId)
+            setFinal(res.data.data);
+            setShowDaily(true);
+        } else {
+            setDailyPlan(list.data.dailyPlan.id)
+            console.log('aaa', list.data.tasks);
+            setFinal(list.data.tasks);
+            setShowDaily(true);
+
+        }
 
     }
     useEffect(() => {
@@ -227,7 +248,13 @@ const AiPlan: React.FC = () => {
                                         <h3 className="planTitle">
                                             {plan.goal}
                                         </h3>
-
+                                        {
+                                            plan.studied_today && (
+                                                <div className="todayTag">
+                                                    今日已学习
+                                                </div>
+                                            )
+                                        }
                                         <div className="planMeta">
 
                                             <div className="metaItem">

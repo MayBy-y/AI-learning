@@ -6,6 +6,7 @@ import PlanRouter from "./ai/Plan.js"
 import konwRouter from "./routes/konwledge.js"
 import knowledgeAiRouter from "./ai/konwlefgeAi.js"
 import userRouter from './routes/login.js'
+import ReviewRouter from "./ai/reviewAI.js"
 import cors from "cors"
 dotenv.config()
 const app = express()
@@ -37,6 +38,7 @@ app.use('/api/ai', ChatRouter)
 app.use('/api/ai', PlanRouter)
 app.use('/api/knowledge', konwRouter)
 app.use('/api/knowAi', knowledgeAiRouter)
+app.use('/api/review', ReviewRouter)
 app.listen(3000, () => {
     console.log("server running")
 })
